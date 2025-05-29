@@ -220,11 +220,12 @@ func (o *options) printValues(wr io.Writer,
 	val := o.renderValue(level, node)
 	meta := node.Meta
 
+	sep := *o.edgeSeparator
 	if meta != nil {
-		fmt.Fprintf(wr, "%s [%v]  %v\n", edge, meta, val)
+		fmt.Fprintf(wr, "%s%s[%v]  %v\n", edge, sep, meta, val)
 		return
 	}
-	fmt.Fprintf(wr, "%s %v\n", edge, val)
+	fmt.Fprintf(wr, "%s%s%v\n", edge, sep, val)
 }
 
 func isEnded(levelsEnded []int, level int) bool {
@@ -297,6 +298,7 @@ var IndentSize = 3
 type options struct {
 	edgeTypeLink, edgeTypeMid, edgeTypeEnd *EdgeType
 	indentSize                             *int
+	edgeSeparator                          *string
 }
 type Option func(*options)
 
@@ -324,6 +326,12 @@ func WithIndentSize(indentSize int) Option {
 	}
 }
 
+func WithEdgeSeparator(sep string) Option {
+	return func(o *options) {
+		o.edgeSeparator = &sep
+	}
+}
+
 func evalOptions(opts ...Option) *options {
 	var o options
 	for _, opt := range opts {
@@ -340,6 +348,10 @@ func evalOptions(opts ...Option) *options {
 	}
 	if o.indentSize == nil {
 		o.indentSize = &IndentSize
+	}
+	if o.edgeSeparator == nil {
+		sep := " "
+		o.edgeSeparator = &sep
 	}
 	return &o
 }
