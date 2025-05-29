@@ -19,6 +19,7 @@ type MetaValue interface{}
 type NodeVisitor func(item *Node)
 
 // Tree represents a tree structure with leaf-nodes and branch-nodes.
+// Note: This interface is not expected to be implemented by users.
 type Tree interface {
 	// AddNode adds a new Node to a branch.
 	AddNode(v Value) Tree
