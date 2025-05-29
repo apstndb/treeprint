@@ -295,6 +295,10 @@ var (
 // It can be updated and used as the default value.
 var IndentSize = 3
 
+var (
+	defaultEdgeSeparator = " "
+)
+
 type options struct {
 	edgeTypeLink, edgeTypeMid, edgeTypeEnd *EdgeType
 	indentSize                             *int
@@ -350,8 +354,7 @@ func evalOptions(opts ...Option) *options {
 		o.indentSize = &IndentSize
 	}
 	if o.edgeSeparator == nil {
-		sep := " "
-		o.edgeSeparator = &sep
+		o.edgeSeparator = &defaultEdgeSeparator
 	}
 	return &o
 }
