@@ -219,6 +219,41 @@ func TestEdgeTypeAndIndent(t *testing.T) {
 	assert.Equal(expected, actual)
 }
 
+func TestStringWithOptions(t *testing.T) {
+	assert := assert.New(t)
+
+	// Restore to the original values
+	defer func(link, mid, end EdgeType, indent int) {
+		EdgeTypeLink = link
+		EdgeTypeMid = mid
+		EdgeTypeEnd = end
+		IndentSize = indent
+	}(EdgeTypeLink, EdgeTypeMid, EdgeTypeEnd, IndentSize)
+
+	tree := New()
+	tree.AddBranch("one").AddNode("two")
+	foo := tree.AddBranch("foo")
+	foo.AddBranch("bar").AddNode("a").AddNode("b").AddNode("c")
+	foo.AddNode("end")
+
+	actual := tree.StringWithOptions(
+		WithEdgeTypeLink("|"),
+		WithEdgeTypeMid("+-"),
+		WithEdgeTypeEnd("+-"),
+		WithIndentSize(2))
+	expected := `.
++- one
+|  +- two
++- foo
+   +- bar
+   |  +- a
+   |  +- b
+   |  +- c
+   +- end
+`
+	assert.Equal(expected, actual)
+}
+
 func TestRelationships(t *testing.T) {
 	assert := assert.New(t)
 
