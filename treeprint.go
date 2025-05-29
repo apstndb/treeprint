@@ -19,6 +19,7 @@ type MetaValue interface{}
 type NodeVisitor func(item *Node)
 
 // Tree represents a tree structure with leaf-nodes and branch-nodes.
+// Note: This interface is not expected to be implemented by users.
 type Tree interface {
 	// AddNode adds a new Node to a branch.
 	AddNode(v Value) Tree
@@ -40,9 +41,12 @@ type Tree interface {
 	//  returns the last Node of a tree
 	FindLastNode() Tree
 	// String renders the tree or subtree as a string.
+	// It is only available to implement fmt.Stringer.
 	String() string
+	// StringWithOptions renders the tree or subtree as a string.
+	StringWithOptions(...Option) string
 	// Bytes renders the tree or subtree as byteslice.
-	Bytes() []byte
+	Bytes(...Option) []byte
 
 	SetValue(value Value)
 	SetMetaValue(meta MetaValue)
@@ -133,7 +137,8 @@ func (n *Node) FindByValue(value Value) Tree {
 	return nil
 }
 
-func (n *Node) Bytes() []byte {
+func (n *Node) Bytes(opts ...Option) []byte {
+	o := evalOptions(opts...)
 	buf := new(bytes.Buffer)
 	level := 0
 	var levelsEnded []int
@@ -145,21 +150,25 @@ func (n *Node) Bytes() []byte {
 		}
 		buf.WriteByte('\n')
 	} else {
-		edge := EdgeTypeMid
+		edge := *o.edgeTypeMid
 		if len(n.Nodes) == 0 {
-			edge = EdgeTypeEnd
+			edge = *o.edgeTypeEnd
 			levelsEnded = append(levelsEnded, level)
 		}
-		printValues(buf, 0, levelsEnded, edge, n)
+		o.printValues(buf, 0, levelsEnded, edge, n)
 	}
 	if len(n.Nodes) > 0 {
-		printNodes(buf, level, levelsEnded, n.Nodes)
+		o.printNodes(buf, level, levelsEnded, n.Nodes)
 	}
 	return buf.Bytes()
 }
 
 func (n *Node) String() string {
-	return string(n.Bytes())
+	return n.StringWithOptions()
+}
+
+func (n *Node) StringWithOptions(opts ...Option) string {
+	return string(n.Bytes(opts...))
 }
 
 func (n *Node) SetValue(value Value) {
@@ -181,34 +190,34 @@ func (n *Node) VisitAll(fn NodeVisitor) {
 	}
 }
 
-func printNodes(wr io.Writer,
+func (o *options) printNodes(wr io.Writer,
 	level int, levelsEnded []int, nodes []*Node) {
 
 	for i, node := range nodes {
-		edge := EdgeTypeMid
+		edge := *o.edgeTypeMid
 		if i == len(nodes)-1 {
 			levelsEnded = append(levelsEnded, level)
-			edge = EdgeTypeEnd
+			edge = *o.edgeTypeEnd
 		}
-		printValues(wr, level, levelsEnded, edge, node)
+		o.printValues(wr, level, levelsEnded, edge, node)
 		if len(node.Nodes) > 0 {
-			printNodes(wr, level+1, levelsEnded, node.Nodes)
+			o.printNodes(wr, level+1, levelsEnded, node.Nodes)
 		}
 	}
 }
 
-func printValues(wr io.Writer,
+func (o *options) printValues(wr io.Writer,
 	level int, levelsEnded []int, edge EdgeType, node *Node) {
 
 	for i := 0; i < level; i++ {
 		if isEnded(levelsEnded, i) {
-			fmt.Fprint(wr, strings.Repeat(" ", IndentSize+1))
+			fmt.Fprint(wr, strings.Repeat(" ", *o.indentSize+1))
 			continue
 		}
-		fmt.Fprintf(wr, "%s%s", EdgeTypeLink, strings.Repeat(" ", IndentSize))
+		fmt.Fprintf(wr, "%s%s", *o.edgeTypeLink, strings.Repeat(" ", *o.indentSize))
 	}
 
-	val := renderValue(level, node)
+	val := o.renderValue(level, node)
 	meta := node.Meta
 
 	if meta != nil {
@@ -227,7 +236,7 @@ func isEnded(levelsEnded []int, level int) bool {
 	return false
 }
 
-func renderValue(level int, node *Node) Value {
+func (o *options) renderValue(level int, node *Node) Value {
 	lines := strings.Split(fmt.Sprintf("%v", node.Value), "\n")
 
 	// If value does not contain multiple lines, return itself.
@@ -237,7 +246,7 @@ func renderValue(level int, node *Node) Value {
 
 	// If value contains multiple lines,
 	// generate a padding and prefix each line with it.
-	pad := padding(level, node)
+	pad := o.padding(level, node)
 
 	for i := 1; i < len(lines); i++ {
 		lines[i] = fmt.Sprintf("%s%s", pad, lines[i])
@@ -251,14 +260,14 @@ func renderValue(level int, node *Node) Value {
 // and, on each level, checking if the Node the last one of its siblings.
 // If a Node is the last one, the padding on that level should be empty (there's nothing to link to below it).
 // If a Node is not the last one, the padding on that level should be the link edge so the sibling below is correctly connected.
-func padding(level int, node *Node) string {
+func (o *options) padding(level int, node *Node) string {
 	links := make([]string, level+1)
 
 	for node.Root != nil {
 		if isLast(node) {
-			links[level] = strings.Repeat(" ", IndentSize+1)
+			links[level] = strings.Repeat(" ", *o.indentSize+1)
 		} else {
-			links[level] = fmt.Sprintf("%s%s", EdgeTypeLink, strings.Repeat(" ", IndentSize))
+			links[level] = fmt.Sprintf("%s%s", *o.edgeTypeLink, strings.Repeat(" ", *o.indentSize))
 		}
 		level--
 		node = node.Root
@@ -274,6 +283,7 @@ func isLast(n *Node) bool {
 
 type EdgeType string
 
+// Their global variables can be updated and used as default values.
 var (
 	EdgeTypeLink EdgeType = "│"
 	EdgeTypeMid  EdgeType = "├──"
@@ -281,7 +291,58 @@ var (
 )
 
 // IndentSize is the number of spaces per tree level.
+// It can be updated and used as the default value.
 var IndentSize = 3
+
+type options struct {
+	edgeTypeLink, edgeTypeMid, edgeTypeEnd *EdgeType
+	indentSize                             *int
+}
+type Option func(*options)
+
+func WithEdgeTypeLink(edgeType EdgeType) Option {
+	return func(o *options) {
+		o.edgeTypeLink = &edgeType
+	}
+}
+
+func WithEdgeTypeMid(edgeType EdgeType) Option {
+	return func(o *options) {
+		o.edgeTypeMid = &edgeType
+	}
+}
+
+func WithEdgeTypeEnd(edgeType EdgeType) Option {
+	return func(o *options) {
+		o.edgeTypeEnd = &edgeType
+	}
+}
+
+func WithIndentSize(indentSize int) Option {
+	return func(o *options) {
+		o.indentSize = &indentSize
+	}
+}
+
+func evalOptions(opts ...Option) *options {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	if o.edgeTypeLink == nil {
+		o.edgeTypeLink = &EdgeTypeLink
+	}
+	if o.edgeTypeMid == nil {
+		o.edgeTypeMid = &EdgeTypeMid
+	}
+	if o.edgeTypeEnd == nil {
+		o.edgeTypeEnd = &EdgeTypeEnd
+	}
+	if o.indentSize == nil {
+		o.indentSize = &IndentSize
+	}
+	return &o
+}
 
 // New Generates new tree
 func New() Tree {

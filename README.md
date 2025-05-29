@@ -1,5 +1,7 @@
-treeprint [![GoDoc](https://godoc.org/github.com/xlab/treeprint?status.svg)](https://godoc.org/github.com/xlab/treeprint) ![test coverage](https://img.shields.io/badge/coverage-68.6%25-green.svg)
+treeprint [![GoDoc](https://godoc.org/github.com/apstndb/treeprint?status.svg)](https://godoc.org/github.com/apstndb/treeprint) ![test coverage](https://img.shields.io/badge/coverage-68.6%25-green.svg)
 =========
+
+This repo is a fork of [`xlab/treeprint`](https://github.com/xlab/treeprint).
 
 Package `treeprint` provides a simple ASCII tree composing tool.
 
@@ -22,10 +24,14 @@ On my system the command yields the following
 
 and I'd like to have the same format for my Go data structures when I print them.
 
+## Difference from original `xlab/treeprint`
+
+- Introduce `Option`. You don't need to modify global variables.
+
 ## Installation
 
 ```
-$ go get github.com/xlab/treeprint
+$ go get github.com/apstndb/treeprint
 ```
 
 ## Concept of work
